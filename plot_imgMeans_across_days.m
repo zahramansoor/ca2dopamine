@@ -49,11 +49,13 @@ exclusion_win=20;%exclusion window pre and post rew lick to look for non-rewarde
 %NEEDED)
 %the way i'm doing this is unnecessary, figure out how to put in one dict???
 %one fig for double rewards
-days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8"];
+%days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9"]; %e156
+%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9"]; %e157
+days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"]; %e158
 src = 'Z:\analysis\plots'; %save location for plots
+%2x2 tiled image
+figure('DefaultAxesFontSize',10); hold on;
 for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
-    figure; 
-    hold on; 
     for daynum = 1:length(days) %iterate through days
         daypath = fullfile(anpath, days{daynum});
         string = sprintf('*mean_plane%d.mat', pln);
@@ -87,13 +89,14 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         rew_idx=find(R); %get indexes of all rewards
         rew_idx_diff = diff(rew_idx); %difference in reward index from last
         short = rew_idx_diff<num_rew_win_frames; %logical for rewards that happen less than x frames from last reward. 0 = single rew.
-        singlerewidx = [0 diff(short)];
+        %------------------gerardo's edits------------------
+        singlerewidx = [0 diff(short)'];
         if(singlerewidx(2) == -1)
             singelidx(1) = 1;
         end
         singlerewidx = find(singlerewidx == 0);
         single_idx = rew_idx(singlerewidx);
-
+        %------------------gerardo's edits------------------
         %if there are any multi rewards
         if any(short)
             multi_reward_num = bwlabel(short);%label all multiple rewards ascending. doubles have single number, triples two consecutive, etc.
@@ -125,28 +128,36 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
             end
             
             norm_double_traces=double_traces./mean(double_traces(1:pre_win_frames,:));
-
-            title(sprintf('mean of double rewards for plane %d', pln));
+            std1 = mean(norm_double_traces,2) + std(norm_double_traces')'; %upper bound
+            std2 = mean(norm_double_traces,2) - std(norm_double_traces')'; %lower bound
+            
+            subplot(2,2,pln)
+            hold all
+            title(sprintf('mean +/- SD of double rewards for plane %d', pln));
             xlabel('seconds from reward lick')
             ylabel('dF/F')
-            plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,mean(norm_double_traces,...
-                2),'LineWidth',2,'DisplayName',days{daynum}); %autocolor
-            
+            x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
+            line = plot(x, mean(norm_double_traces,2),...
+                'LineWidth',2,'DisplayName',days{daynum}); %autocolor
+            x2 = [x, fliplr(x)];
+            inbtw = [std1', fliplr(std2')]; %shading std
+            h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
+            set(h,'facealpha',.2);
             clear ysize %to prevent index errors
+            hold off
         end
-        %formatting to keep track of days plotted w/o legend
-        txt = sprintf('recording days: %s', strjoin(days, ', '));
-        annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
-        currfile = strcat(src, '\', anpath(4:7), sprintf('_double_rew_across_days_plane%d.fig', pln));
-        savefig(currfile)
     end
-    hold off
 end
+%formatting to keep track of days plotted w/o legend
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_double_rew_across_days.fig');
+savefig(currfile)
+hold off
 
 %one fig for single rewards
+figure('DefaultAxesFontSize',10); hold on;
 for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
-    figure; 
-    hold on; 
     for daynum = 1:length(days) %iterate through days
         clear single_idx single_lick_idx %to prevent index errors
         daypath = fullfile(anpath, days{daynum});
@@ -218,27 +229,35 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
             single_traces(:,i) = base_mean(single_lick_idx(i)-pre_win_frames:single_lick_idx(i)+post_win_frames)';%lick at pre_win_frames+1
         end
         norm_single_traces=single_traces./mean(single_traces(1:pre_win_frames,:));
-
-        title(sprintf('mean of single rewards for plane %d', pln));
+        
+        std1 = mean(norm_single_traces,2) + std(norm_single_traces')'; %upper bound
+        std2 = mean(norm_single_traces,2) - std(norm_single_traces')'; %lower bound
+        
+        subplot(2,2,pln)
+        hold all
+        title(sprintf('mean +/- SD of single rewards for plane %d', pln));
         xlabel('seconds from first reward lick')
         ylabel('dF/F')
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,...
-            mean(norm_single_traces,2),'LineWidth',2,'DisplayName',days{daynum}); %autocolor
-   
-        %formatting to keep track of days plotted w/o legend
-        txt = sprintf('recording days: %s', strjoin(days, ', '));
-        annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
-        currfile = strcat(src, '\', anpath(4:7), sprintf('_single_rew_across_days_plane%d.fig', pln));
-        savefig(currfile)
+        x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
+        line = plot(x, mean(norm_single_traces,2),...
+            'LineWidth',2,'DisplayName',days{daynum}); %autocolor
+        x2 = [x, fliplr(x)];
+        inbtw = [std1', fliplr(std2')]; %shading std
+        h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
+        set(h,'facealpha',.1);
+        hold off
     end
-    hold off
-    %legend
 end
+%formatting to keep track of days plotted w/o legend
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_single_rew_across_days.fig');
+savefig(currfile)
+hold off
 
 %one fig for non reward licks
+figure('DefaultAxesFontSize',10); hold on;
 for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
-    figure; 
-    hold on; 
     for daynum = 1:length(days) %iterate through days
         daypath = fullfile(anpath, days{daynum});
         string = sprintf('*mean_plane%d.mat', pln);
@@ -300,20 +319,31 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         end
         norm_nr_traces = nr_traces./mean(nr_traces(1:pre_win_frames,:));
         
-        title(sprintf('mean of non-rewarded licks for plane %d', pln));
+        std1 = mean(norm_nr_traces,2) + std(norm_nr_traces')'; %upper bound
+        std2 = mean(norm_nr_traces,2) - std(norm_nr_traces')'; %lower bound
+        
+        subplot(2,2,pln)
+        hold all
+        title(sprintf('mean +/- SD of non-rewarded licks for plane %d', pln));
         xlabel('seconds from non-rewarded lick')
         ylabel('dF/F')
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,...
-            nanmean(norm_nr_traces,2),'LineWidth',2,'DisplayName',days{daynum}); %autocolor
-        
-        %formatting to keep track of days plotted w/o legend
-        txt = sprintf('recording days: %s', strjoin(days, ', '));
-        annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
-        currfile = strcat(src, '\', anpath(4:7), sprintf('_no_rew_across_days_plane%d.fig', pln));
-        savefig(currfile)    
+        x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
+        line = plot(x, mean(norm_nr_traces,2),...
+            'LineWidth',2,'DisplayName',days{daynum}); %autocolor
+        x2 = [x, fliplr(x)];
+        inbtw = [std1', fliplr(std2')]; %shading std
+        h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
+        set(h,'facealpha',.1);
+        hold off          
     end
-    hold off
 end
+%formatting to keep track of days plotted w/o legend
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_no_rew_across_days.fig');
+savefig(currfile)  
+hold off
+
 %%
 %---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
 %---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
