@@ -49,12 +49,17 @@ exclusion_win=20;%exclusion window pre and post rew lick to look for non-rewarde
 %NEEDED)
 %the way i'm doing this is unnecessary, figure out how to put in one dict???
 %one fig for double rewards
-%days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9"]; %e156
-%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9"]; %e157
-days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"]; %e158
+days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9"]; %e156, need to skip d7
+%bc no clampex file
+%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9"]; %e157, need to skip d4
+%unidirectional day
+%days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"]; %e158
 src = 'Z:\analysis\plots'; %save location for plots
+%open 3 figures
 %2x2 tiled image
-figure('DefaultAxesFontSize',10); hold on;
+fig1 = figure('DefaultAxesFontSize',10); hold on; %double rew
+fig2 = figure('DefaultAxesFontSize',10); hold on; %single rew
+fig3 = figure('DefaultAxesFontSize',10); hold on; %no rew
 for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
     for daynum = 1:length(days) %iterate through days
         daypath = fullfile(anpath, days{daynum});
@@ -86,17 +91,19 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
 
         %ed's vars for reward location + analysis
         R = bwlabel(rew_binned>rew_thresh); %label rewards, ascending
-        rew_idx=find(R); %get indexes of all rewards
+        rew_idx = find(R); %get indexes of all rewards
         rew_idx_diff = diff(rew_idx); %difference in reward index from last
-        short = rew_idx_diff<num_rew_win_frames; %logical for rewards that happen less than x frames from last reward. 0 = single rew.
+        short = rew_idx_diff<num_rew_win_frames; %logical for rewards that happen less than x frames from last reward. 0 = single rew, 1 = double rew
         %------------------gerardo's edits------------------
         singlerewidx = [0 diff(short)'];
         if(singlerewidx(2) == -1)
-            singelidx(1) = 1;
+            singlerewidx(1) = 1;
         end
         singlerewidx = find(singlerewidx == 0);
         single_idx = rew_idx(singlerewidx);
         %------------------gerardo's edits------------------
+        %DOUBLE REWARDS       
+        set(0,'CurrentFigure',fig1)
         %if there are any multi rewards
         if any(short)
             multi_reward_num = bwlabel(short);%label all multiple rewards ascending. doubles have single number, triples two consecutive, etc.
@@ -146,54 +153,9 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
             clear ysize %to prevent index errors
             hold off
         end
-    end
-end
-%formatting to keep track of days plotted w/o legend
-txt = sprintf('recording days: %s', strjoin(days, ', '));
-annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
-currfile = strcat(src, '\', anpath(4:7), '_double_rew_across_days.fig');
-savefig(currfile)
-hold off
-
-%one fig for single rewards
-figure('DefaultAxesFontSize',10); hold on;
-for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
-    for daynum = 1:length(days) %iterate through days
-        clear single_idx single_lick_idx %to prevent index errors
-        daypath = fullfile(anpath, days{daynum});
-        string = sprintf('*mean_plane%d.mat', pln);
-        matfile = dir(fullfile(daypath, string)); %find mean plane 1 for analysis
-        matfl = fullfile(daypath, matfile.name); %join path to mat file for the plane
-        disp(matfl)
-        disp(' ')
-        load(matfl);
-        %------------------ed's calculated values - unchanged------------------
-        frame_time = 1/frame_rate;
-        num_rew_win_frames = round(num_rew_win_sec/frame_time);%window in frames
-        rew_lick_win_frames = round(rew_lick_win/frame_time);%window in frames
-        post_win_frames = round(post_win/frame_time);
-        pre_win_frames = round(pre_win/frame_time);
-        exclusion_win_frames = round(exclusion_win/frame_time);
-        [B,~,bin_indx] = histcounts(1:numframes,length(base_mean));
-        rew_binned = accumarray(bin_indx(:),rewards,[],@mean);
-        mean_base_mean = mean(base_mean);
-        
-        norm_base_mean = base_mean/mean_base_mean;
-        lick_binned = accumarray(bin_indx(:),lick,[],@min);
-        roe_binned = accumarray(bin_indx(:),ROE,[],@max);
-        L = bwlabel(lick_binned<lickThresh);
-        supraLick = L > 0;
-
-        mean_lick = mean(lick_binned);
-        %------------------ed's calculated values - unchanged------------------
-
-        %ed's vars for reward location + analysis
-        R = bwlabel(rew_binned>rew_thresh); %label rewards, ascending
-        rew_idx=find(R); %get indexes of all rewards
-        rew_idx_diff = diff(rew_idx); %difference in reward index from last
-        short = rew_idx_diff<num_rew_win_frames; %logical for rewards that happen less than x frames from last reward. 0 = single rew.
-
-        %single rewards
+                
+        %SINGLE REWARDS
+        set(0,'CurrentFigure',fig2)
         multi_rew_expand=bwlabel(short);%single rewards are 0
         for i=1:length(multi_rew_expand)
             multi_rew_expand(find(multi_rew_expand==i,1,'last')+1)=i;%need to expand index of multi reward by 1 to properly match rew_ind
@@ -245,54 +207,10 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         inbtw = [std1', fliplr(std2')]; %shading std
         h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
         set(h,'facealpha',.1);
-        hold off
-    end
-end
-%formatting to keep track of days plotted w/o legend
-txt = sprintf('recording days: %s', strjoin(days, ', '));
-annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
-currfile = strcat(src, '\', anpath(4:7), '_single_rew_across_days.fig');
-savefig(currfile)
-hold off
-
-%one fig for non reward licks
-figure('DefaultAxesFontSize',10); hold on;
-for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
-    for daynum = 1:length(days) %iterate through days
-        daypath = fullfile(anpath, days{daynum});
-        string = sprintf('*mean_plane%d.mat', pln);
-        matfile = dir(fullfile(daypath, string)); %find mean plane 1 for analysis
-        matfl = fullfile(daypath, matfile.name); %join path to mat file for the plane
-        disp(matfl)
-        disp(' ')
-        load(matfl);
-        %------------------ed's calculated values - unchanged------------------
-        frame_time = 1/frame_rate;
-        num_rew_win_frames = round(num_rew_win_sec/frame_time);%window in frames
-        rew_lick_win_frames = round(rew_lick_win/frame_time);%window in frames
-        post_win_frames = round(post_win/frame_time);
-        pre_win_frames = round(pre_win/frame_time);
-        exclusion_win_frames = round(exclusion_win/frame_time);
-        [B,~,bin_indx] = histcounts(1:numframes,length(base_mean));
-        rew_binned = accumarray(bin_indx(:),rewards,[],@mean);
-        mean_base_mean = mean(base_mean);
-        
-        norm_base_mean = base_mean/mean_base_mean;
-        lick_binned = accumarray(bin_indx(:),lick,[],@min);
-        roe_binned = accumarray(bin_indx(:),ROE,[],@max);
-        L = bwlabel(lick_binned<lickThresh);
-        supraLick = L > 0;
-
-        mean_lick = mean(lick_binned);
-        %------------------ed's calculated values - unchanged------------------
-
-        %ed's vars for reward location + analysis
-        R = bwlabel(rew_binned>rew_thresh); %label rewards, ascending
-        rew_idx=find(R); %get indexes of all rewards
-        rew_idx_diff = diff(rew_idx); %difference in reward index from last
-        short = rew_idx_diff<num_rew_win_frames; %logical for rewards that happen less than x frames from last reward. 0 = single rew.
-
-        %non-rewarded licks
+        hold off      
+              
+        %NON-REWARDED LICKS
+        set(0,'CurrentFigure',fig3)
         all_rew_lick = single_lick_idx;
         if exist('double_lick_idx', 'var')
             all_rew_lick = [all_rew_lick double_lick_idx];%combine arrays, could also use union but should not have replicates
@@ -334,16 +252,27 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         inbtw = [std1', fliplr(std2')]; %shading std
         h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
         set(h,'facealpha',.1);
-        hold off          
+        hold off              
     end
-end
+end       
+%formatting to keep track of days plotted w/o legend
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_double_rew_across_days.fig');
+savefig(fig1, currfile)
+%formatting to keep track of days plotted w/o legend
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_single_rew_across_days.fig');
+savefig(fig2, currfile)
+%one fig for non reward licks
 %formatting to keep track of days plotted w/o legend
 txt = sprintf('recording days: %s', strjoin(days, ', '));
 annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_no_rew_across_days.fig');
-savefig(currfile)  
+savefig(fig3, currfile)  
 hold off
-
+        
 %%
 %---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
 %---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
