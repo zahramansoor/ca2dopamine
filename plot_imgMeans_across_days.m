@@ -18,12 +18,13 @@
         %track time since last reward or last double
         %rolling average of rewards
         
-%ZD's addition
+%ZD's additions
         %plot mean of plane 1, plane 2, etc. for same animal across
         %multiple days
+        %NOTE: does not include solenoid plots since no fake rewards were
+        %given
         
-close all
-clear all
+close all; clear all
 [tifffilename, tiffpath] = uigetfile('*.mat','pick mat file'); %get path to one of the mat files for 1 day / 1 animal
 cd (tiffpath); %set path
 %get animal's folder path; i.e. up one folder
@@ -49,18 +50,20 @@ exclusion_win=20;%exclusion window pre and post rew lick to look for non-rewarde
 %NEEDED)
 %the way i'm doing this is unnecessary, figure out how to put in one dict???
 %one fig for double rewards
-days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9"]; %e156, need to skip d7
+days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9", "d10", "d11", "d12"]; %e156, need to skip d7
 %bc no clampex file
-%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9"]; %e157, need to skip d4
+%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12"]; %e157, need to skip d4
 %unidirectional day
-%days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"]; %e158
+%days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11"]; %e158
 src = 'Z:\analysis\plots'; %save location for plots
 %open 3 figures
 %2x2 tiled image
 fig1 = figure('DefaultAxesFontSize',10); hold on; %double rew
 fig2 = figure('DefaultAxesFontSize',10); hold on; %single rew
 fig3 = figure('DefaultAxesFontSize',10); hold on; %no rew
-for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
+fig4 = figure('DefaultAxesFontSize',10); hold on; %double, single, no rew overlay
+fig5 = figure('DefaultAxesFontSize',10); hold on; %fluo during 2 min delay period
+for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
     for daynum = 1:length(days) %iterate through days
         daypath = fullfile(anpath, days{daynum});
         string = sprintf('*mean_plane%d.mat', pln);
@@ -135,12 +138,12 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
             end
             
             norm_double_traces=double_traces./mean(double_traces(1:pre_win_frames,:));
-            std1 = mean(norm_double_traces,2) + std(norm_double_traces')'; %upper bound
-            std2 = mean(norm_double_traces,2) - std(norm_double_traces')'; %lower bound
+            std1 = prctile(norm_double_traces', 25)'; %25 p 
+            std2 = prctile(norm_double_traces', 75)'; %75 p
             
             subplot(2,2,pln)
             hold all
-            title(sprintf('mean +/- SD of double rewards for plane %d', pln));
+            title(sprintf('mean, 25 & 75%ile of double rewards for plane %d', pln));
             xlabel('seconds from reward lick')
             ylabel('dF/F')
             x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
@@ -192,12 +195,12 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         end
         norm_single_traces=single_traces./mean(single_traces(1:pre_win_frames,:));
         
-        std1 = mean(norm_single_traces,2) + std(norm_single_traces')'; %upper bound
-        std2 = mean(norm_single_traces,2) - std(norm_single_traces')'; %lower bound
+        std1 = prctile(norm_single_traces', 25)'; %25 p 
+        std2 = prctile(norm_single_traces', 75)'; %75 p 
         
         subplot(2,2,pln)
         hold all
-        title(sprintf('mean +/- SD of single rewards for plane %d', pln));
+        title(sprintf('mean, 25 & 75%ile of single rewards for plane %d', pln));
         xlabel('seconds from first reward lick')
         ylabel('dF/F')
         x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
@@ -237,12 +240,12 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         end
         norm_nr_traces = nr_traces./mean(nr_traces(1:pre_win_frames,:));
         
-        std1 = mean(norm_nr_traces,2) + std(norm_nr_traces')'; %upper bound
-        std2 = mean(norm_nr_traces,2) - std(norm_nr_traces')'; %lower bound
+        std1 = prctile(norm_nr_traces', 25)'; %25 p 
+        std2 = prctile(norm_nr_traces', 75)'; %75 p 
         
         subplot(2,2,pln)
         hold all
-        title(sprintf('mean +/- SD of non-rewarded licks for plane %d', pln));
+        title(sprintf('mean, 25 & 75%ile of non-rewarded licks for plane %d', pln));
         xlabel('seconds from non-rewarded lick')
         ylabel('dF/F')
         x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
@@ -252,19 +255,56 @@ for pln = 1:4 %4 = most superficial layer, 1 = deepest layer
         inbtw = [std1', fliplr(std2')]; %shading std
         h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
         set(h,'facealpha',.1);
-        hold off              
+        hold off 
+        
+        %plot double, single, no reward mean overlays
+        %does not have different colors/line for the plot
+        if exist('double_rew', 'var')
+            set(0,'CurrentFigure',fig4)
+            subplot(2,2,pln)
+            hold all
+            title(sprintf('smoothed mean double & single rewards & non-rewarded licks for plane %d', pln));
+            xlabel('seconds from first reward lick')
+            ylabel('dF/F')
+            plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,...
+                smoothdata(mean(norm_double_traces,2),'gaussian',gauss_win/2),'Color','r');
+            plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,...
+                smoothdata(mean(norm_single_traces,2),'gaussian',gauss_win/2),'Color','b'); 
+            plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,...
+                smoothdata(nanmean(norm_nr_traces,2),'gaussian',gauss_win/2),'Color',[0.4 0.4 0.4]);     
+            hold off
+        end
+       
+        %MEAN FLUORESCENCE DURING 1ST 2 MIN (DELAY PERIOD)
+        %find indices corresponding to first 2 min
+        [sz1,sz2] = size(norm_base_mean);
+        indstart = sz2/(50000/31.25) * 240; %50000/31.25 gives us total imaging time in s
+        fluostart = base_mean(1:ceil(indstart));
+        norm_fluostart = base_mean(1:ceil(indstart))/mean(base_mean(1:ceil(indstart)));
+        set(0,'CurrentFigure',fig5)
+        subplot(2,2,pln)
+        hold all
+        title(sprintf('mean fluorescence in first 240 s, plane %d', pln));
+        xlabel('frames from start of session')
+        ylabel('dF/F')
+        plot(norm_fluostart, 'LineWidth',0.5)
+        hold off
     end
 end       
+%fig for double rewards
 %formatting to keep track of days plotted w/o legend
+hold all
 txt = sprintf('recording days: %s', strjoin(days, ', '));
 annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_double_rew_across_days.fig');
 savefig(fig1, currfile)
-%formatting to keep track of days plotted w/o legend
+hold off
+%fig for single rewards
 txt = sprintf('recording days: %s', strjoin(days, ', '));
 annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_single_rew_across_days.fig');
 savefig(fig2, currfile)
+hold off
 %one fig for non reward licks
 %formatting to keep track of days plotted w/o legend
 txt = sprintf('recording days: %s', strjoin(days, ', '));
@@ -272,145 +312,16 @@ annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_no_rew_across_days.fig');
 savefig(fig3, currfile)  
 hold off
+%fig for reward overlays
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_double_single_no_rew_across_days.fig');
+savefig(fig4, currfile)  
+hold off
+%fig for first 120s 
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_first_2min_delay_period.fig');
+savefig(fig4, currfile)  
+hold off
         
-%%
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-%---------------------------------------------------------------NOT EDITED BEYOND THIS POINT------------------------------------------------------------------------  
-
-save(tifffilename,'norm_nr_traces','nr_traces','nr_lick_idx','all_rew_lick','nr_lick','-append');
-
- if exist('double_rew', 'var')
-    figure;
-    hold on; 
-    title('Smoothed Mean Double Rewards, Singles, non-Rewarded Licks');
-    xlabel('seconds from first reward lick')
-    ylabel('dF/F')
-%     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_traces,'Color',[.8 .8 .8]);
-    plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(mean(norm_double_traces,2),'gaussian',gauss_win/2));
-    plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(mean(norm_single_traces,2),'gaussian',gauss_win/2)); 
-    plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(nanmean(norm_nr_traces,2),'gaussian',gauss_win/2)); 
-
-%     legend(['n = ',num2str(size(norm_single_traces,2))])
-    legend('Double Reward','Single Reward','Unrewarded Licks')
-
-    currfile=strcat(stripped_tifffilename,'_doubles_singles_NR.fig');
-    savefig(currfile)
-    
- end
-
- %solenoid 2   
- if exist('sol2','var')
-     sol2_binned = accumarray(bin_indx(:),sol2,[],@max);
-     Sol2 = bwlabel(sol2_binned>sol2_thresh);
-     sol2_rew = Sol2>0;
-     sol2_idx=find(sol2_rew);
-     sol2_idx_diff=diff(sol2_idx);
-     sol2_short=sol2_idx_diff<num_rew_win_frames;
-     %can do doubles sol2 here.  adapt doubles code from above
- 
- 
-    if any(sol2_rew)
-
-     figure,hold on;plot((supraLick*.01)+1); plot(((rew_binned*2)+1));plot(smoothdata(norm_base_mean,'gaussian',gauss_win));plot(smoothdata(((roe_binned/100)+1),'gaussian',gauss_win));
-     plot((sol2_rew*.012)+1);
-     title(['Smoothed fluorescence, licks, rewards, ROE, and Solenoid2. win= ' num2str(gauss_win)]);
-     currfile=strcat(stripped_tifffilename,'_Smoothed_lick_rew_ROE_fl_sol2.fig');
-     savefig(currfile)
-
-
-     %single solenoid2
-      sol2_multi_rew_expand=bwlabel(sol2_short);%single rewards are 0
-     for i=1:length(sol2_multi_rew_expand)
-           sol2_multi_rew_expand(find(sol2_multi_rew_expand==i,1,'last')+1)=i;%need to expand index of multi reward by 1 to properly match rew_ind
-     end
-
-     if length(sol2_multi_rew_expand) < length(sol2_idx)
-         sol2_multi_rew_expand(end+1)=0;%need to add extra on end to match index. Above for loop does this if last rew is multi reward. this does for single last.
-     end
-
-     single_sol2=find(sol2_multi_rew_expand==0);
-
-      for i=1:length(single_sol2)
-
-              %single_idx(i)=rew_idx(i); %orig but doesn't eliminate doubles
-             single_sol2_idx(i)=sol2_idx(single_sol2(i));
-          if single_sol2_idx(i)+rew_lick_win_frames < length(sol2_rew)%if window to search for lick after rew is past length of supraLick, doesn't update single_lick_idx, but single_idx is
-        %      single_lick_idx(i)= (find(supraLick(single_idx(i):single_idx(i)+num_rew_win_frames),1,'first'))+single_idx(i)-1;
-              single_sol2_lick_idx(i)= (find(sol2_rew(single_sol2_idx(i):single_sol2_idx(i)+rew_lick_win_frames),1,'first'))+single_sol2_idx(i)-1;
-              %looks for first lick after rew with window =exclusion_win_frames
-              %however first lick can be much further in naive animals
-          end
-      end
-    %     single_sol2_lick_idx=single_sol2_lick_idx>0;    %if can't find lick in window, remove from list of lick idx
-          if single_sol2_lick_idx(1) - pre_win_frames <0%remove events too early
-              single_sol2_lick_idx(1)=[];
-          end
-          if single_sol2_lick_idx(end) + post_win_frames > length(base_mean)%remove events too late
-              single_sol2_lick_idx(end)=[];
-          end
-     single_sol2_traces=zeros(pre_win_frames+post_win_frames+1,length(single_sol2_lick_idx));
-      for i=1:length(single_sol2_lick_idx)
-         single_sol2_traces(:,i)=base_mean(single_sol2_lick_idx(i)-pre_win_frames:single_sol2_lick_idx(i)+post_win_frames)';%lick at pre_win_frames+1
-      end
-        norm_single_sol2_traces=single_sol2_traces./mean(single_sol2_traces(1:pre_win_frames,:));
-
-        figure;
-        hold on; 
-        title('Single Solenoid2');
-        xlabel('seconds from first reward lick')
-        ylabel('dF/F')
-    %     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_traces,'Color',[.8 .8 .8]);
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_sol2_traces);
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,mean(norm_single_sol2_traces,2),'k','LineWidth',2); 
-    %     legend(['n = ',num2str(size(norm_single_traces,2))])
-        legend()
-
-        currfile=strcat(stripped_tifffilename,'_single_sol2.fig');
-        savefig(currfile)
-
-        save(tifffilename,'sol2_binned','sol2_rew','sol2_idx','sol2_short','sol2_multi_rew_expand','single_sol2','single_sol2_idx','single_sol2_lick_idx','single_sol2_traces',...
-            'norm_single_sol2_traces','sol2_thresh','-append')
-
-
-        figure;
-        hold on; 
-        title('Smoothed Mean Double Rewards, Singles, non-Rewarded Licks, and Fake Rewards');
-        xlabel('seconds from first reward lick')
-        ylabel('dF/F')
-    %     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_traces,'Color',[.8 .8 .8]);
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(mean(norm_double_traces,2),'gaussian',gauss_win/2));
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(mean(norm_single_traces,2),'gaussian',gauss_win/2)); 
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(nanmean(norm_nr_traces,2),'gaussian',gauss_win/2)); 
-        plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,smoothdata(mean(norm_single_sol2_traces,2),'gaussian',gauss_win/2)); 
-    %     legend(['n = ',num2str(size(norm_single_traces,2))])
-        legend('Double Reward','Single Reward','Unrewarded Licks','Fake Reward')
-
-        currfile=strcat(stripped_tifffilename,'doubles_singles_NR_fakes.fig');
-        savefig(currfile)
-
-    end
-
- end
-
- 
- 
-
- 
