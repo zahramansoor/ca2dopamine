@@ -31,7 +31,13 @@ cd (tiffpath); %set path
 idcs = strfind(tiffpath,'\');
 anpath = tiffpath(1:idcs(end)-4);
 numplanes = 4; %ZD defined this since before it was loaded w the mat file
-
+if anpath(4:7)=='e156' %ZD excluding problematic recording days
+    days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9", "d10", "d11", "d12", "d13"]; %skip days w/o clampex file
+elseif anpath(4:7)=='e157'
+    days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12", "d13"]; %skip unidirectional day
+elseif anpath(4:7)=='e158'
+    days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12", "d13"]; %all days
+end
 %------------------ed's params - unchanged------------------
 gauss_win=12;
 frame_rate=31.25/numplanes;
@@ -49,12 +55,7 @@ exclusion_win=20;%exclusion window pre and post rew lick to look for non-rewarde
 %only care about these days (MAY NEED TO MODIFY LIST IF MORE DAYS ARE
 %NEEDED)
 %the way i'm doing this is unnecessary, figure out how to put in one dict???
-%one fig for double rewards
-days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9", "d10", "d11", "d12"]; %e156, need to skip d7
-%bc no clampex file
-%days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12"]; %e157, need to skip d4
-%unidirectional day
-%days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11"]; %e158
+
 src = 'Z:\analysis\plots'; %save location for plots
 %open 3 figures
 %2x2 tiled image
@@ -143,7 +144,7 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
             
             subplot(2,2,pln)
             hold all
-            title(sprintf('mean, 25 & 75%ile of double rewards for plane %d', pln));
+            title(sprintf('mean, 25 & 75 percentile of double rewards for plane %d', pln));
             xlabel('seconds from reward lick')
             ylabel('dF/F')
             x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
@@ -200,7 +201,7 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         
         subplot(2,2,pln)
         hold all
-        title(sprintf('mean, 25 & 75%ile of single rewards for plane %d', pln));
+        title(sprintf('mean, 25 & 75 percentile of single rewards for plane %d', pln));
         xlabel('seconds from first reward lick')
         ylabel('dF/F')
         x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
