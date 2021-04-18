@@ -5,8 +5,6 @@
 %also plots non-rewarded licks that are outside of defined lick window
 %used after concatenate_tif_mean_EH and abffileSelectStartEnd_mean_img
 
-
-
 %to do
 %make sure triples are plotted and saved for older experiments
 %start and stop trigger ave
@@ -24,11 +22,11 @@ clear all
 [tifffilename,tiffpath]=uigetfile('*.mat','pick your .mat file');
 cd (tiffpath); %set path
 load(tifffilename);
-stripped_tifffilename=regexprep(tifffilename,'.mat',''); 
+stripped_tifffilename = regexprep(tifffilename,'.mat',''); 
 
 gauss_win=12;
 frame_rate=31.25/numplanes;
-lickThresh=-0.085;
+lickThresh=-0.085;%-0.085; ZD changed to -0.07 because code was crashing otherwise...
 rew_thresh=0.001;
 sol2_thresh=1.5;
 num_rew_win_sec=5;%window in seconds for looking for multiple rewards
@@ -60,8 +58,10 @@ exclusion_win_frames=round(exclusion_win/frame_time);
  currfile=strcat(stripped_tifffilename,'_licks_rew.fig');
  savefig(currfile)
  
- figure,hold on;plot((supraLick*.01)+1); plot(((rew_binned*2)+1));plot(smoothdata(norm_base_mean,'gaussian',gauss_win));plot(smoothdata(((roe_binned/100)+1),'gaussian',gauss_win));
- title(['Smoothed licks, rewards, ROE, and fluorescence. win= ' num2str(gauss_win)]);
+ figure('DefaultAxesFontSize',16); %zmd changed for ppt fig
+ hold on;plot((supraLick*.01)+1); plot(((rew_binned*2)+1));plot(smoothdata(norm_base_mean,'gaussian',gauss_win), 'LineWidth',2);plot(smoothdata(((roe_binned/100)+1),'gaussian',gauss_win));
+ %title(['Smoothed licks, rewards, ROE, and fluorescence. win= ' num2str(gauss_win)]);
+ xlim([0 12500])
  currfile=strcat(stripped_tifffilename,'_Smoothed_lick_rew_ROE_fl.fig');
  savefig(currfile)
  
@@ -172,8 +172,8 @@ if any(short)
 %     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_double_traces,'Color',[.8 .8 .8]);%light gray
     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_double_traces);%auto color
     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,mean(norm_double_traces,2),'k','LineWidth',2);
-%     legend(['n = ',num2str(size(norm_double_traces,2))])%n=
-    legend()
+    legend(['n = ',num2str(size(norm_double_traces,2))])%n=
+    %legend()
 
     
     currfile=strcat(stripped_tifffilename,'_double_rew.fig');
@@ -196,15 +196,12 @@ end
  single_rew=find(multi_rew_expand==0);
 
   for i=1:length(single_rew)
-      
           %single_idx(i)=rew_idx(i); %orig but doesn't eliminate doubles
          single_idx(i)=rew_idx(single_rew(i));
       if single_idx(i)+rew_lick_win_frames < length(supraLick)%if window to search for lick after rew is past length of supraLick, doesn't update single_lick_idx, but single_idx is
-    %      single_lick_idx(i)= (find(supraLick(single_idx(i):single_idx(i)+num_rew_win_frames),1,'first'))+single_idx(i)-1;
-          single_lick_idx(i)= (find(supraLick(single_idx(i):single_idx(i)+rew_lick_win_frames),1,'first'))+single_idx(i)-1;
+          single_lick_idx(i) = (find(supraLick(single_idx(i):single_idx(i)+rew_lick_win_frames),1,'first'))+single_idx(i)-1;
           %looks for first lick after rew with window =exclusion_win_frames
-          %however first lick can be much further in naive animals
-          
+          %however first lick can be much further in naive animals          
       end
   end
       if single_lick_idx(1) - pre_win_frames <0%remove events too early
@@ -227,8 +224,8 @@ end
 %     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_traces,'Color',[.8 .8 .8]);
     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,norm_single_traces);
     plot(frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames,mean(norm_single_traces,2),'k','LineWidth',2); 
-%     legend(['n = ',num2str(size(norm_single_traces,2))])
-    legend()
+    legend(['n = ',num2str(size(norm_single_traces,2))])
+    %legend()
     
     currfile=strcat(stripped_tifffilename,'_single_rew.fig');
     savefig(currfile)

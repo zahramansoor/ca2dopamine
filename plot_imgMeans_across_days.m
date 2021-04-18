@@ -32,16 +32,20 @@ idcs = strfind(tiffpath,'\');
 anpath = tiffpath(1:idcs(end)-4);
 numplanes = 4; %ZD defined this since before it was loaded w the mat file
 if anpath(4:7)=='e156' %ZD excluding problematic recording days
-    days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9", "d10", "d11", "d12", "d13"]; %skip days w/o clampex file
+    days = ["d2", "d3", "d4", "d5", "d6", "d8", "d9", "d10", ...
+        "d11", "d12", "d13", "d15", "d16", "d17", "d18"]; %skip days w/o clampex file
 elseif anpath(4:7)=='e157'
-    days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12", "d13"]; %skip unidirectional day
+    days = ["d2", "d3", "d5", "d6", "d7", "d8", "d9", "d10", "d11", ...
+        "d12", "d13", "d14", "d15", "d16", "d17", "d18"]; %skip unidirectional day
 elseif anpath(4:7)=='e158'
-    days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11", "d12", "d13"]; %all days
+    days = ["d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", ...
+        "d10", "d11", "d12", "d13", "d14", "d15", "d16", "d17", ...
+        "d18"]; %all days
 end
 %------------------ed's params - unchanged------------------
 gauss_win=12;
 frame_rate=31.25/numplanes;
-lickThresh=-0.07; %ZD changed bc code was crashing otherwise...
+lickThresh=-0.080; %ZD changed bc code was crashing otherwise...
 rew_thresh=0.001;
 sol2_thresh=1.5;
 num_rew_win_sec=5;%window in seconds for looking for multiple rewards
@@ -64,7 +68,8 @@ fig2 = figure('DefaultAxesFontSize',10); hold on; %single rew
 fig3 = figure('DefaultAxesFontSize',10); hold on; %no rew
 fig4 = figure('DefaultAxesFontSize',10); hold on; %double, single, no rew overlay
 fig5 = figure('DefaultAxesFontSize',10); hold on; %fluo during 2 min delay period
-for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
+%fig6 = figure('DefaultAxesFontSize',10); hold on; %mean lick + mean ROE per day (not aligned to reward)
+for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer    
     for daynum = 1:length(days) %iterate through days
         daypath = fullfile(anpath, days{daynum});
         string = sprintf('*mean_plane%d.mat', pln);
@@ -73,6 +78,7 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         disp(matfl)
         disp(' ')
         load(matfl);
+        %save to struct
         %------------------ed's calculated values - unchanged------------------
         frame_time = 1/frame_rate;
         num_rew_win_frames = round(num_rew_win_sec/frame_time);%window in frames
@@ -92,7 +98,6 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
 
         mean_lick = mean(lick_binned);
         %------------------ed's calculated values - unchanged------------------
-
         %ed's vars for reward location + analysis
         R = bwlabel(rew_binned>rew_thresh); %label rewards, ascending
         rew_idx = find(R); %get indexes of all rewards
@@ -105,7 +110,7 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         end
         singlerewidx = find(singlerewidx == 0);
         single_idx = rew_idx(singlerewidx);
-        %------------------gerardo's edits------------------
+        %------------------gerardo's edits------------------        
         %DOUBLE REWARDS       
         set(0,'CurrentFigure',fig1)
         %if there are any multi rewards
@@ -141,6 +146,8 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
             norm_double_traces=double_traces./mean(double_traces(1:pre_win_frames,:));
             std1 = prctile(norm_double_traces', 25)'; %25 p 
             std2 = prctile(norm_double_traces', 75)'; %75 p
+            %save traces to struct
+            dy3.(sprintf('%s', days{daynum})) = mean(norm_double_traces,2);
             
             subplot(2,2,pln)
             hold all
@@ -198,7 +205,9 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         
         std1 = prctile(norm_single_traces', 25)'; %25 p 
         std2 = prctile(norm_single_traces', 75)'; %75 p 
-        
+        %save traces to struct
+        dy4.(sprintf('%s', days{daynum})) = mean(norm_single_traces,2);
+            
         subplot(2,2,pln)
         hold all
         title(sprintf('mean, 25 & 75 percentile of single rewards for plane %d', pln));
@@ -243,6 +252,8 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         
         std1 = prctile(norm_nr_traces', 25)'; %25 p 
         std2 = prctile(norm_nr_traces', 75)'; %75 p 
+        %save traces to struct
+        dy5.(sprintf('%s', days{daynum})) = mean(norm_nr_traces,2);
         
         subplot(2,2,pln)
         hold all
@@ -277,7 +288,7 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         end
        
         %MEAN FLUORESCENCE DURING 1ST 2 MIN (DELAY PERIOD)
-        %find indices corresponding to first 2 min
+        %find indices corresponding to first 4 min
         [sz1,sz2] = size(norm_base_mean);
         indstart = sz2/(50000/31.25) * 240; %50000/31.25 gives us total imaging time in s
         fluostart = base_mean(1:ceil(indstart));
@@ -290,7 +301,37 @@ for pln = 1:numplanes %4 = most superficial layer, 1 = deepest layer
         ylabel('dF/F')
         plot(norm_fluostart, 'LineWidth',0.5)
         hold off
+        
+        %MEAN FLUO + ROE
+        %pad indices around rewards with 1's
+        R_win = zeros(size(R));
+        for i = 1:length(rew_idx)            
+            if R(rew_idx(i))-pre_win_frames<=0
+                R_win(rew_idx(i):rew_idx(i)+post_win_frames) = 1; %if negative index
+            elseif rew_idx(i)+post_win_frames>length(R) %if exceeds frames
+                R_win(rew_idx(i)-pre_win_frames:rew_idx(i)) = 1;
+            else
+                R_win(rew_idx(i)-pre_win_frames:rew_idx(i)+post_win_frames) = 1;
+            end
+        end
+        %taking - of the ROE here for the correlation so + correlation =
+        %roe and fluo are correlated
+        corr_roe_fluo = corrcoef(roe_binned*-1, base_mean); %(~R_win) = without rewards; R_win > 0 = only rewards
+        dy1.(sprintf('%s', days{daynum})) = corr_roe_fluo(1,2);
+        %MEAN FLUO + LICK? is this useful?
+        corr_lick_fluo = corrcoef(supraLick, base_mean);
+        dy2.(sprintf('%s', days{daynum})) = corr_lick_fluo(1,2);
+        %relationship between plane intensity, and 'positive' or 'negative'
+        %dF/F around reward
+        %try for single traces only first
+%         peak = mean(norm_single_traces,2)-1;
+%         corr_peak_fluo = corrcoef(mean(peak), base_mean);
     end
+    pl.(sprintf('roe_pln%d', pln)) = dy1;
+    pl.(sprintf('lick_pln%d', pln)) = dy2;
+    pl.(sprintf('dbrew_pln%d', pln)) = dy3;
+    pl.(sprintf('srew_pln%d', pln)) = dy4;
+    pl.(sprintf('norew_pln%d', pln)) = dy5;
 end       
 %fig for double rewards
 %formatting to keep track of days plotted w/o legend
@@ -306,6 +347,7 @@ annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_single_rew_across_days.fig');
 savefig(fig2, currfile)
 hold off
+
 %one fig for non reward licks
 %formatting to keep track of days plotted w/o legend
 txt = sprintf('recording days: %s', strjoin(days, ', '));
@@ -323,6 +365,106 @@ hold off
 txt = sprintf('recording days: %s', strjoin(days, ', '));
 annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
 currfile = strcat(src, '\', anpath(4:7), '_first_2min_delay_period.fig');
-savefig(fig4, currfile)  
+savefig(fig5, currfile)  
 hold off
-        
+
+%save correlation values
+save(strcat(src, '\', anpath(4:7), '_corr_roe_lick_fluo.mat'), '-struct', 'pl');
+%plot corr for roe vs. fluo
+figure; 
+hold all
+%plot across days, per plane
+plot(cellfun(@(x)(pl.roe_pln1.(x)),fieldnames(pl.roe_pln1)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.roe_pln2.(x)),fieldnames(pl.roe_pln2)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.roe_pln3.(x)),fieldnames(pl.roe_pln3)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.roe_pln4.(x)),fieldnames(pl.roe_pln4)), 'LineWidth', 2)
+title('pearson correlation between roe and mean fluorescence per plane, across days');
+xlabel('recording day')
+ylabel('correlation coefficient')
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_roe_fluo_corr_per_plane_across_days.fig');
+savefig(currfile)  
+hold off
+%plot corr for lick vs. fluo
+figure; 
+hold all
+%plot across days, per plane
+plot(cellfun(@(x)(pl.lick_pln1.(x)),fieldnames(pl.lick_pln1)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.lick_pln2.(x)),fieldnames(pl.lick_pln2)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.lick_pln3.(x)),fieldnames(pl.lick_pln3)), 'LineWidth', 2)
+plot(cellfun(@(x)(pl.lick_pln4.(x)),fieldnames(pl.lick_pln4)), 'LineWidth', 2)
+title('pearson correlation between lick and mean fluorescence per plane, across days');
+xlabel('recording day')
+ylabel('correlation coefficient')
+txt = sprintf('recording days: %s', strjoin(days, ', '));
+annotation('textbox',[.9 .5 .1 .2],'String',txt,'EdgeColor','none')
+currfile = strcat(src, '\', anpath(4:7), '_lick_fluo_corr_per_plane_across_days.fig');
+savefig(currfile)  
+hold off
+
+%plot mean of traces across all days, w/ 25 & 75% percentile shading
+fields = ["dbrew", "srew", "norew"];
+plns = ["pln1", "pln2", "pln3", "pln4"];
+fig1 = figure('DefaultAxesFontSize',14); hold on; %double rew
+fig2 = figure('DefaultAxesFontSize',14); hold on; %single rew
+fig3 = figure('DefaultAxesFontSize',14); hold on; %no rew
+figs = [fig1,fig2,fig3];
+all_plns = false;
+if all_plns == true
+    for i=1:length(fields)
+        for j=1:length(plns)
+            set(0,'CurrentFigure',figs(i)); hold all
+            %do for each plane..
+            f = fieldnames(pl.(sprintf('%s_%s', fields(i), plns(j))));
+            days_trace = zeros(196,length(f)); %pre/post window for frames
+            for k=1:length(f)
+                days_trace(:,k) = pl.(sprintf('%s_%s', fields(i), plns(j))).(char(f(k)));
+            end
+            %take mean across days
+            mean_days_trace = nanmean(days_trace,2); %why do some days have NaNs??? esp for NR licks
+            std1 = prctile(days_trace', 25)'; %25 p 
+            std2 = prctile(days_trace', 75)'; %75 p 
+            xlabel('seconds from first reward lick')
+            ylabel('dF/F')
+            x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
+            line = plot(x,mean_days_trace,...
+                'LineWidth',2); %autocolor
+            x2 = [x, fliplr(x)];
+            inbtw = [std1', fliplr(std2')]; %shading std
+            h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
+            set(h,'facealpha',.1);
+            currfile = strcat(src, '\', anpath(4:7), sprintf('mean_%s_traces_av_across_days.fig', fields(i)));
+            savefig(currfile)
+            hold off
+        end
+    end
+else %just plane 4
+    for i=1:length(fields)        
+        set(0,'CurrentFigure',figs(i)); hold all
+        %do for each plane..
+        f = fieldnames(pl.(sprintf('%s_%s', fields(i), plns(4))));
+        days_trace = zeros(196,length(f)); %pre/post window for frames
+        for k=1:length(f)
+            days_trace(:,k) = pl.(sprintf('%s_%s', fields(i), plns(4))).(char(f(k)));
+        end
+        %take mean across days
+        mean_days_trace = nanmean(days_trace,2); %why do some days have NaNs??? esp for NR licks
+        std1 = prctile(days_trace', 25)'; %25 p 
+        std2 = prctile(days_trace', 75)'; %75 p 
+        xlabel('seconds from first reward lick')
+        ylabel('dF/F')
+        ylim([0.99 1.015])
+        x = frame_time*(-pre_win_frames):frame_time:frame_time*post_win_frames;
+        line = plot(x,mean_days_trace,...
+            'LineWidth',2,'Color',[0.6350, 0.0780, 0.1840]);
+        x2 = [x, fliplr(x)];
+        inbtw = [std1', fliplr(std2')]; %shading std
+        h = fill(x2, inbtw, get(line, 'Color'), 'LineStyle', 'none');%);
+        set(h,'facealpha',.1);
+        currfile = strcat(src, '\', anpath(4:7), sprintf('mean_%s_traces_av_across_days_pln4.fig', fields(i)));
+        savefig(currfile)
+        hold off
+    end
+end
+
